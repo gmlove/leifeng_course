@@ -1,0 +1,6 @@
+**/*.pyc
+**/.cache
+**/__pycache__
+week9/dataset/
+week9/summary/
+week9/.vscode/
