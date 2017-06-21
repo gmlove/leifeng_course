@@ -11,7 +11,7 @@ tf.logging.set_verbosity(tf.logging.INFO)
 
 
 def _build_generator(input_data, name='generator'):
-    with tf.variable_scope(name) as var_scope:
+    with tf.variable_scope(name):
         net = layers.dense(input_data, 128)
         net = tf.nn.relu(net)
         net = tf.reshape(net, [-1, 4, 4, 8])
@@ -28,7 +28,7 @@ def _build_generator(input_data, name='generator'):
 
 
 def _build_discriminator(input_data, reuse_variables=False, name='discriminator'):
-    with tf.variable_scope(name, reuse=reuse_variables) as var_scope:
+    with tf.variable_scope(name, reuse=reuse_variables):
         net = layers.conv2d(input_data, 16, [3, 3], strides=[2, 2], activation=tf.nn.relu, padding='same', name='conv2d_1')
         net = layers.batch_normalization(net, momentum=0.9, training=True)
         net = layers.conv2d(net, 32, [3, 3], strides=[2, 2], activation=tf.nn.relu, padding='same', name='conv2d_2')
@@ -52,7 +52,7 @@ class Callback(object):
 
 class SummaryCallback(Callback):
 
-    def __init__(self, session, model, data_dir='./summary/train_tf-bn', every_step=10):
+    def __init__(self, session, model, data_dir='./summary/train_tf-bn_fix-bn', every_step=10):
         summary_writer = tf.summary.FileWriter(data_dir, session.graph)
 
         def func(dataset, current_step):
@@ -106,10 +106,10 @@ class GANModel(object):
         self.discriminator_vars = [var for var in all_vars if 'discriminator' in var.name]
 
         update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
-        with tf.control_dependencies([var for var in update_ops if 'discriminator' in var.name]):
+        with tf.control_dependencies([op for op in update_ops if 'discriminator' in op.name]):
             self.d_optimizer = tf.train.AdamOptimizer(learning_rate, beta1=0.5).minimize(
                 self.discriminator_loss, var_list=self.discriminator_vars)
-        with tf.control_dependencies([var for var in update_ops if 'generator' in var.name]):
+        with tf.control_dependencies([op for op in update_ops if 'generator' in op.name]):
             self.g_optimizer = tf.train.AdamOptimizer(learning_rate, beta1=0.5).minimize(
                 self.generator_loss, var_list=self.generator_vars)
 
