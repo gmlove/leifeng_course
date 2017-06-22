@@ -41,6 +41,7 @@ class GANModelTest(tf.test.TestCase):
         model = GANModel(100)
         dataset = GANDataset(np.random.normal(size=(3, 28, 28, 1)), 100, 1)
         with self.test_session() as session:
+            session.run(tf.global_variables_initializer())
             model.fit(session, dataset, 1, 2)
 
 
