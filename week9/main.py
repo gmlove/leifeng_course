@@ -10,9 +10,13 @@ from dataset import GANDataset
 tf.logging.set_verbosity(tf.logging.INFO)
 
 
+def _normalize_input(input_data):
+    return tf.cast(tf.expand_dims(input_data, 1), tf.float32) / 10
+
+
 def _build_generator(input_data, condition_input, name='generator'):
     with tf.variable_scope(name):
-        condition_input = tf.cast(tf.expand_dims(condition_input, 1), tf.float32)
+        condition_input = _normalize_input(condition_input)
         net = tf.concat([input_data, condition_input], 1)
         net = layers.dense(input_data, 128)
         net = tf.nn.relu(net)
@@ -29,14 +33,18 @@ def _build_generator(input_data, condition_input, name='generator'):
     return net
 
 
-def _build_discriminator(input_data, reuse_variables=False, name='discriminator'):
+def _build_discriminator(input_data, condition_input, reuse_variables=False, name='discriminator'):
     with tf.variable_scope(name, reuse=reuse_variables):
+        condition_input = _normalize_input(condition_input)
         net = layers.conv2d(input_data, 16, [3, 3], strides=[2, 2], activation=tf.nn.relu, padding='same', name='conv2d_1')
         net = layers.batch_normalization(net, momentum=0.9, training=True)
         net = layers.conv2d(net, 32, [3, 3], strides=[2, 2], activation=tf.nn.relu, padding='same', name='conv2d_2')
         net = layers.batch_normalization(net, momentum=0.9, training=True)
         net = layers.conv2d(net, 64, [3, 3], strides=[2, 2], activation=tf.nn.relu, padding='same', name='conv2d_3')
         net = layers.conv2d(net, 128, [3, 3], strides=[2, 2], activation=tf.nn.relu, padding='same', name='conv2d_4')
+        condition_input = tf.concat([condition_input] * 4, 1)
+        condition_input = tf.reshape(condition_input, [-1, 2, 2, 1])
+        net = tf.concat([net, condition_input], 3)
         net = contrib_layers.flatten(net)
         net = layers.dense(net, 1)
     return net
@@ -83,24 +91,32 @@ class GANModel(object):
         self.noise_len = noise_len
 
         self.noise_input = tf.placeholder(tf.float32, shape=(None, self.noise_len))
-        self.generator_condition_input = tf.placeholder(tf.int32, shape=(None, ))
-        self.generated_image = _build_generator(self.noise_input, self.generator_condition_input)
+        self.right_condition_input = tf.placeholder(tf.int32, shape=(None, ))
+        self.wrong_condition_input = tf.placeholder(tf.int32, shape=(None, ))
+
+        self.generated_image = _build_generator(self.noise_input, self.right_condition_input)
 
         self.discriminator_input = tf.placeholder(tf.float32, shape=(None, 28, 28, 1))
-        self.discriminated_real_logits = _build_discriminator(self.discriminator_input)
+        self.discriminated_real_right_logits = _build_discriminator(
+            self.discriminator_input, self.right_condition_input)
+        self.discriminated_real_wrong_logits = _build_discriminator(
+            self.discriminator_input, self.wrong_condition_input, reuse_variables=True)
 
         self.discriminated_fake_logits = _build_discriminator(
-            self.generated_image, reuse_variables=True)
+            self.generated_image, self.right_condition_input, reuse_variables=True)
 
         self.generator_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(
             logits=self.discriminated_fake_logits, labels=tf.ones_like(self.discriminated_fake_logits)))
 
-        self.discriminator_real_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(
-            logits=self.discriminated_real_logits, labels=tf.ones_like(self.discriminated_real_logits)))
+        self.discriminator_real_right_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(
+            logits=self.discriminated_real_right_logits, labels=tf.ones_like(self.discriminated_real_right_logits)))
+        self.discriminator_real_wrong_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(
+            logits=self.discriminated_real_wrong_logits, labels=tf.ones_like(self.discriminated_real_wrong_logits)))
         self.discriminator_fake_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(
             logits=self.discriminated_fake_logits, labels=tf.zeros_like(self.discriminated_fake_logits)))
 
-        self.discriminator_loss = self.discriminator_real_loss + self.discriminator_fake_loss
+        self.discriminator_loss = self.discriminator_real_right_loss + self.discriminator_real_wrong_loss \
+            + self.discriminator_fake_loss
 
         all_vars = tf.trainable_variables()
         generator_vars = [var for var in all_vars if 'generator' in var.name]
@@ -114,13 +130,13 @@ class GANModel(object):
             self.g_optimizer = tf.train.AdamOptimizer(learning_rate, beta1=0.5).minimize(
                 self.generator_loss, var_list=generator_vars)
 
-        tf.summary.scalar('probabilities/p_fake',
-            tf.reduce_mean(tf.nn.sigmoid(self.discriminated_fake_logits)))
-        tf.summary.scalar('probabilities/p_real',
-            tf.reduce_mean(tf.nn.sigmoid(self.discriminated_real_logits)))
+        tf.summary.scalar('probabilities/p_fake', tf.reduce_mean(tf.nn.sigmoid(self.discriminated_fake_logits)))
+        tf.summary.scalar('probabilities/p_real_right', tf.reduce_mean(tf.nn.sigmoid(self.discriminated_real_right_logits)))
+        tf.summary.scalar('probabilities/p_real_wrong', tf.reduce_mean(tf.nn.sigmoid(self.discriminated_real_wrong_logits)))
         tf.summary.scalar('loss/generator_loss', self.generator_loss)
         tf.summary.scalar('loss/discriminator_loss', self.discriminator_loss)
-        tf.summary.scalar('loss/discriminator_real_loss', self.discriminator_real_loss)
+        tf.summary.scalar('loss/discriminator_real_right_loss', self.discriminator_real_right_loss)
+        tf.summary.scalar('loss/discriminator_real_wrong_loss', self.discriminator_real_wrong_loss)
         tf.summary.scalar('loss/discriminator_fake_loss', self.discriminator_fake_loss)
         tf.summary.image('generated_image', self.generated_image)
         tf.summary.image('real_image', self.discriminator_input)
