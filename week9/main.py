@@ -157,14 +157,17 @@ class GANModel(object):
             while dataset.has_more_than(k_steps):
                 train_step += 1
                 for k in range(k_steps):
-                    real_images, noise_input = dataset.next_batch(), dataset.next_noise()
+                    (real_images, right_label, wrong_label), noise_input = dataset.next_batch(), dataset.next_noise()
                     session.run(self.d_optimizer, feed_dict={
                         self.discriminator_input: real_images,
+                        self.right_condition_input: right_label,
+                        self.wrong_condition_input: wrong_label,
                         self.noise_input: noise_input
                     })
-                noise_input = dataset.next_noise()
+                noise_input, any_label = dataset.next_noise(), dataset.next_label()
                 session.run(self.g_optimizer, feed_dict={
-                    self.noise_input: noise_input
+                    self.noise_input: noise_input,
+                    self.right_condition_input: any_label
                 })
                 self._run_callbacks(callbacks, train_step, dataset)
             dataset.reset()
