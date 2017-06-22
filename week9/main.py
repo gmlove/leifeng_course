@@ -52,7 +52,7 @@ class Callback(object):
 
 class SummaryCallback(Callback):
 
-    def __init__(self, session, model, data_dir='./summary/train_tf-bn_fix-bn', every_step=10):
+    def __init__(self, session, model, data_dir='./summary/train', every_step=10):
         summary_writer = tf.summary.FileWriter(data_dir, session.graph)
 
         def func(dataset, current_step):
@@ -85,36 +85,36 @@ class GANModel(object):
 
         self.discriminator_input = tf.placeholder(tf.float32, shape=(None, 28, 28, 1))
         self.discriminated_real_logits = _build_discriminator(self.discriminator_input)
-        self.discriminated_real = tf.nn.sigmoid(self.discriminated_real_logits)
 
         self.discriminated_fake_logits = _build_discriminator(
             self.generated_image, reuse_variables=True)
-        self.discriminated_fake = tf.nn.sigmoid(self.discriminated_fake_logits)
 
         self.generator_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(
-            logits=self.discriminated_fake_logits, labels=tf.ones_like(self.discriminated_fake)))
+            logits=self.discriminated_fake_logits, labels=tf.ones_like(self.discriminated_fake_logits)))
 
         self.discriminator_real_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(
-            logits=self.discriminated_real_logits, labels=tf.ones_like(self.discriminated_real)))
+            logits=self.discriminated_real_logits, labels=tf.ones_like(self.discriminated_real_logits)))
         self.discriminator_fake_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(
-            logits=self.discriminated_fake_logits, labels=tf.zeros_like(self.discriminated_fake)))
+            logits=self.discriminated_fake_logits, labels=tf.zeros_like(self.discriminated_fake_logits)))
 
         self.discriminator_loss = self.discriminator_real_loss + self.discriminator_fake_loss
 
         all_vars = tf.trainable_variables()
-        self.generator_vars = [var for var in all_vars if 'generator' in var.name]
-        self.discriminator_vars = [var for var in all_vars if 'discriminator' in var.name]
+        generator_vars = [var for var in all_vars if 'generator' in var.name]
+        discriminator_vars = [var for var in all_vars if 'discriminator' in var.name]
 
         update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
         with tf.control_dependencies([op for op in update_ops if 'discriminator' in op.name]):
             self.d_optimizer = tf.train.AdamOptimizer(learning_rate, beta1=0.5).minimize(
-                self.discriminator_loss, var_list=self.discriminator_vars)
+                self.discriminator_loss, var_list=discriminator_vars)
         with tf.control_dependencies([op for op in update_ops if 'generator' in op.name]):
             self.g_optimizer = tf.train.AdamOptimizer(learning_rate, beta1=0.5).minimize(
-                self.generator_loss, var_list=self.generator_vars)
+                self.generator_loss, var_list=generator_vars)
 
-        tf.summary.scalar('loss/p_generator', tf.reduce_mean(self.discriminated_fake))
-        tf.summary.scalar('loss/p_discriminator', tf.reduce_mean(self.discriminated_real))
+        tf.summary.scalar('probabilities/p_fake',
+            tf.reduce_mean(tf.nn.sigmoid(self.discriminated_fake_logits)))
+        tf.summary.scalar('probabilities/p_real',
+            tf.reduce_mean(tf.nn.sigmoid(self.discriminated_real_logits)))
         tf.summary.scalar('loss/generator_loss', self.generator_loss)
         tf.summary.scalar('loss/discriminator_loss', self.discriminator_loss)
         tf.summary.scalar('loss/discriminator_real_loss', self.discriminator_real_loss)
@@ -135,7 +135,7 @@ class GANModel(object):
 
         train_step = 0
         for i in range(epochs):
-            while dataset.has_more_than(k_steps + 1):
+            while dataset.has_more_than(k_steps):
                 train_step += 1
                 for k in range(k_steps):
                     real_images, noise_input = dataset.next_batch(), dataset.next_noise()
