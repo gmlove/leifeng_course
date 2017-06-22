@@ -14,7 +14,11 @@ class GANModelTest(tf.test.TestCase):
         with self.test_session() as session:
             session.run(tf.global_variables_initializer())
             noise = np.random.normal(size=(1, 100))
-            generated = session.run(model.generated_image, feed_dict={model.noise_input: noise})
+            condition = np.random.randint(0, 10, size=(1, ))
+            generated = session.run(model.generated_image, feed_dict={
+                model.noise_input: noise,
+                model.generator_condition_input: condition
+            })
             self.assertTupleEqual(generated.shape, (1, 28, 28, 1))
 
     def test_discriminate_real(self):

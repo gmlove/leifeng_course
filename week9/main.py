@@ -10,8 +10,10 @@ from dataset import GANDataset
 tf.logging.set_verbosity(tf.logging.INFO)
 
 
-def _build_generator(input_data, name='generator'):
+def _build_generator(input_data, condition_input, name='generator'):
     with tf.variable_scope(name):
+        condition_input = tf.cast(tf.expand_dims(condition_input, 1), tf.float32)
+        net = tf.concat([input_data, condition_input], 1)
         net = layers.dense(input_data, 128)
         net = tf.nn.relu(net)
         net = tf.reshape(net, [-1, 4, 4, 8])
@@ -81,7 +83,8 @@ class GANModel(object):
         self.noise_len = noise_len
 
         self.noise_input = tf.placeholder(tf.float32, shape=(None, self.noise_len))
-        self.generated_image = _build_generator(self.noise_input)
+        self.generator_condition_input = tf.placeholder(tf.int32, shape=(None, ))
+        self.generated_image = _build_generator(self.noise_input, self.generator_condition_input)
 
         self.discriminator_input = tf.placeholder(tf.float32, shape=(None, 28, 28, 1))
         self.discriminated_real_logits = _build_discriminator(self.discriminator_input)
