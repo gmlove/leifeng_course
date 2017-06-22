@@ -48,10 +48,12 @@ class GANModelTest(tf.test.TestCase):
     def test_discriminate_fake(self):
         model = GANModel()
         noise = np.random.normal(size=(1, 100))
+        condition = np.random.randint(0, 10, size=(1, ))
         with self.test_session() as session:
             session.run(tf.global_variables_initializer())
             discriminate_logits = session.run(model.discriminated_fake_logits, feed_dict={
-                model.noise_input: noise
+                model.noise_input: noise,
+                model.right_condition_input: condition
             })
             self.assertTupleEqual(discriminate_logits.shape, (1, 1))
 
