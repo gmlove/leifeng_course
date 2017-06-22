@@ -17,13 +17,23 @@ class GANModelTest(tf.test.TestCase):
             generated = session.run(model.generated_image, feed_dict={model.noise_input: noise})
             self.assertTupleEqual(generated.shape, (1, 28, 28, 1))
 
-    def test_discriminate(self):
+    def test_discriminate_real(self):
         model = GANModel()
         images = np.random.normal(size=(1, 28, 28, 1))
         with self.test_session() as session:
             session.run(tf.global_variables_initializer())
             discriminate_logits = session.run(model.discriminated_real_logits, feed_dict={
                 model.discriminator_input: images
+            })
+            self.assertTupleEqual(discriminate_logits.shape, (1, 1))
+
+    def test_discriminate_fake(self):
+        model = GANModel()
+        noise = np.random.normal(size=(1, 100))
+        with self.test_session() as session:
+            session.run(tf.global_variables_initializer())
+            discriminate_logits = session.run(model.discriminated_fake_logits, feed_dict={
+                model.noise_input: noise
             })
             self.assertTupleEqual(discriminate_logits.shape, (1, 1))
 
