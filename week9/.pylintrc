@@ -9,7 +9,7 @@
 # can either give multiple identifier separated by comma (,) or put this option
 # multiple time (only on the command line, not in the configuration file where
 # it should appear only once).
-disable=C0111,C0325,E1129
+disable=C0111,C0325,E1129,C0413
 
 [TYPECHECK]
 

@@ -4,3 +4,9 @@
 week9/dataset/
 week9/summary/
 week9/.vscode/
+week9/tmp/
+week9/saved/
+week9/samples/
+live-coding-gan/
+*.pdf
+bak
