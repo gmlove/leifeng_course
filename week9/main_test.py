@@ -1,5 +1,8 @@
 from __future__ import absolute_import
 
+import os
+import shutil
+
 import tensorflow as tf
 import numpy as np
 
@@ -63,6 +66,17 @@ class GANModelTest(tf.test.TestCase):
         with self.test_session() as session:
             session.run(tf.global_variables_initializer())
             model.fit(session, dataset, 1, 2)
+
+    def test_load_model(self):
+        test_save_path = 'tmp/test_save'
+        model = GANModel(100, save_path=test_save_path)
+        if os.path.exists(test_save_path):
+            shutil.rmtree(test_save_path)
+        os.makedirs(test_save_path)
+        with self.test_session() as session:
+            session.run(tf.global_variables_initializer())
+            model.saver.save(session, test_save_path + "/1.ckpt")
+            model.load(session)
 
 
 if __name__ == '__main__':
